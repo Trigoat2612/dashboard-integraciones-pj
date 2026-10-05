@@ -39,3 +39,7 @@ export function IconChevron(props: SVGProps<SVGSVGElement>) {
 export function IconReset(props: SVGProps<SVGSVGElement>) {
   return <svg {...base} {...props}><path d="M4 8V4h4"/><path d="M5.5 5.5A8 8 0 1 1 4 12"/></svg>;
 }
+
+export function IconHistory(props: SVGProps<SVGSVGElement>) {
+  return <svg {...base} {...props}><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>;
+}

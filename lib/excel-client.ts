@@ -214,8 +214,14 @@ function fingerprint(records: JudicialRecord[]): string {
   return (hash >>> 0).toString(16);
 }
 
+async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function parseExcelFile(file: File): Promise<ImportPreview> {
   const buffer = await file.arrayBuffer();
+  const [fileSha256] = await Promise.all([sha256Hex(buffer)]);
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true, cellFormula: false });
   const seen = new Set<string>();
   const records: JudicialRecord[] = [];
@@ -272,6 +278,8 @@ export async function parseExcelFile(file: File): Promise<ImportPreview> {
 
   return {
     fileName: file.name,
+    fileSizeBytes: file.size,
+    fileSha256,
     records,
     sheets,
     totalRows: records.length,

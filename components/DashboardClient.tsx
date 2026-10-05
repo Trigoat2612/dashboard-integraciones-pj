@@ -4,13 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import { IconChevron, IconDownload, IconReset, IconUpload } from "@/components/icons";
 import { parseExcelFile } from "@/lib/excel-client";
-import type { ImportPreview, JudicialRecord } from "@/lib/types";
+import type { ImportAudit, ImportAuditRow, ImportPreview, JudicialRecord } from "@/lib/types";
 
 type ApiPayload = {
   records: JudicialRecord[];
   databaseEnabled: boolean;
   lastImport: string | null;
 };
+
+type ImportHistoryPayload = {
+  imports: ImportAudit[];
+};
+
+const AUDIT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const HISTORY_PAGE_SIZE = 200;
 
 type Filters = {
   integration: string;
@@ -68,6 +75,24 @@ function downloadCsv(records: JudicialRecord[]) {
   URL.revokeObjectURL(href);
 }
 
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("es-PE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatBytes(value: number | null): string {
+  if (!value || value <= 0) return "—";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function actionLabel(action: ImportAuditRow["action"]): string {
+  if (action === "inserted") return "Nuevo";
+  if (action === "updated") return "Actualizado";
+  if (action === "legacy") return "Migrado";
+  return "Sin cambio";
+}
+
 export default function DashboardClient() {
   const [records, setRecords] = useState<JudicialRecord[]>([]);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
@@ -78,9 +103,16 @@ export default function DashboardClient() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("resumen");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [importMode, setImportMode] = useState<"replace" | "append">("replace");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [auditEmail, setAuditEmail] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [importMessage, setImportMessage] = useState("");
+  const [imports, setImports] = useState<ImportAudit[]>([]);
+  const [historyError, setHistoryError] = useState("");
+  const [selectedImportId, setSelectedImportId] = useState<number | null>(null);
+  const [historyRows, setHistoryRows] = useState<ImportAuditRow[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyDetailBusy, setHistoryDetailBusy] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
@@ -106,12 +138,27 @@ export default function DashboardClient() {
     }
   }, []);
 
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+  const loadHistory = useCallback(async () => {
+    setHistoryError("");
+    try {
+      const response = await fetch("/api/imports?limit=30", { cache: "no-store" });
+      if (!response.ok) throw new Error("No se pudo leer el historial de cargas.");
+      const data = (await response.json()) as ImportHistoryPayload;
+      setImports(data.imports ?? []);
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "Error al leer el historial.");
+    }
+  }, []);
 
   useEffect(() => {
-    const ids = ["resumen", "distribucion", "dependencias", "fuente"];
+    void loadData();
+    void loadHistory();
+    const savedEmail = window.localStorage.getItem("sijud.auditEmail");
+    if (savedEmail) setAuditEmail(savedEmail);
+  }, [loadData, loadHistory]);
+
+  useEffect(() => {
+    const ids = ["resumen", "distribucion", "dependencias", "fuente", "historial"];
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
       if (visible?.target.id) setActiveSection(visible.target.id);
@@ -256,11 +303,17 @@ export default function DashboardClient() {
 
   const onFile = async (file: File | null) => {
     setPreview(null);
+    setSelectedFile(null);
     setImportMessage("");
     if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      setImportMessage("El archivo supera el límite de 4 MB para importación y conservación histórica.");
+      return;
+    }
     setImportBusy(true);
     try {
       const result = await parseExcelFile(file);
+      setSelectedFile(file);
       setPreview(result);
       setImportMessage(result.totalRows ? `Vista previa: ${result.totalRows.toLocaleString("es-PE")} filas fuente. ${result.ignoredSheets} hoja(s) de resumen fueron omitidas.` : "No se encontraron filas compatibles.");
     } catch (error) {
@@ -270,21 +323,49 @@ export default function DashboardClient() {
     }
   };
 
+  const loadImportDetail = async (importId: number, append = false) => {
+    setHistoryDetailBusy(true);
+    setHistoryError("");
+    try {
+      const offset = append && selectedImportId === importId ? historyRows.length : 0;
+      const response = await fetch(`/api/imports/${importId}?offset=${offset}&limit=${HISTORY_PAGE_SIZE}`, { cache: "no-store" });
+      const result = (await response.json()) as { rows?: ImportAuditRow[]; total?: number; error?: string };
+      if (!response.ok) throw new Error(result.error ?? "No se pudo leer el detalle histórico.");
+      setSelectedImportId(importId);
+      setHistoryTotal(Number(result.total ?? 0));
+      setHistoryRows((current) => (append && selectedImportId === importId ? [...current, ...(result.rows ?? [])] : result.rows ?? []));
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : "Error al leer el detalle histórico.");
+    } finally {
+      setHistoryDetailBusy(false);
+    }
+  };
+
   const commitImport = async () => {
-    if (!preview?.records.length) return;
+    if (!preview?.records.length || !selectedFile) return;
+    const email = auditEmail.trim().toLocaleLowerCase("es");
+    if (!AUDIT_EMAIL_RE.test(email)) {
+      setImportMessage("Ingresa un correo electrónico válido para registrar la auditoría de la carga.");
+      return;
+    }
+
     setImportBusy(true);
     setImportMessage("");
     try {
-      const response = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: preview.records, fileName: preview.fileName, mode: importMode }),
-      });
+      const form = new FormData();
+      form.append("file", selectedFile);
+      form.append("userEmail", email);
+      const response = await fetch("/api/import", { method: "POST", body: form });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "No se pudo guardar la importación.");
-      setImportMessage(`Importación completada: ${Number(result.saved).toLocaleString("es-PE")} registros guardados.`);
+      window.localStorage.setItem("sijud.auditEmail", email);
+      setImportMessage(
+        `Carga #${Number(result.importId)} completada: ${Number(result.inserted).toLocaleString("es-PE")} nuevos, ` +
+          `${Number(result.updated).toLocaleString("es-PE")} actualizados y ${Number(result.unchanged).toLocaleString("es-PE")} sin cambio.`,
+      );
       setPreview(null);
-      await loadData();
+      setSelectedFile(null);
+      await Promise.all([loadData(), loadHistory()]);
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : "Error al guardar.");
     } finally {
@@ -432,7 +513,7 @@ export default function DashboardClient() {
           <div className="section-heading">
             <div className="eyebrow"><span className="num">04</span> · Fuente Excel</div>
             <h2>Actualizar la <em>base estadística</em></h2>
-            <p className="lede">El importador detecta AÑO, CSJ/Distrito Judicial, Sede, Órgano/Instancia y la métrica de cantidad. Las hojas “Res*” se consideran tablas dinámicas de referencia y se omiten para evitar doble conteo.</p>
+            <p className="lede">El importador cruza cada fila con la base vigente: actualiza cantidades existentes y agrega claves nuevas sin eliminar registros ausentes del archivo. Cada carga conserva auditoría e histórico inmutable.</p>
           </div>
           <div className="import-grid">
             <div className="import-box">
@@ -442,15 +523,23 @@ export default function DashboardClient() {
                 <span>La vista previa se procesa en el navegador antes de guardar.</span>
                 <input type="file" accept=".xlsx,.xls" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
               </label>
+              <div className="merge-policy">
+                <strong>Actualización incremental</strong>
+                <span>Coincidencia: Integración + Año + CSJ + Sede + Órgano/Instancia + Medida. Las coincidencias se actualizan; las claves nuevas se insertan.</span>
+              </div>
               <div className="import-controls">
-                <label><span>Modo de guardado</span><select value={importMode} onChange={(e) => setImportMode(e.target.value === "append" ? "append" : "replace")}><option value="replace">Reemplazar base</option><option value="append">Agregar registros</option></select></label>
-                <button className="btn btn-primary" type="button" onClick={() => void commitImport()} disabled={!preview?.records.length || importBusy || !databaseEnabled}>{importBusy ? "Procesando…" : "Guardar importación"}</button>
+                <label>
+                  <span>Correo del usuario · auditoría</span>
+                  <input type="email" value={auditEmail} onChange={(event) => setAuditEmail(event.target.value)} placeholder="usuario@dominio.pe" autoComplete="email" />
+                </label>
+                <button className="btn btn-primary" type="button" onClick={() => void commitImport()} disabled={!preview?.records.length || !selectedFile || importBusy || !databaseEnabled || !AUDIT_EMAIL_RE.test(auditEmail.trim())}>{importBusy ? "Procesando…" : "Actualizar base"}</button>
               </div>
               {importMessage ? <p className="import-message">{importMessage}</p> : null}
             </div>
 
             <div className="preview-box">
               <div className="panel-head"><div><span className="panel-kicker">Vista previa</span><h3>{preview?.fileName ?? "Sin archivo seleccionado"}</h3></div>{preview ? <span className="panel-count">{preview.totalRows.toLocaleString("es-PE")} filas</span> : null}</div>
+              {preview ? <div className="file-fingerprint"><span>{formatBytes(preview.fileSizeBytes)}</span><span>SHA-256 · {preview.fileSha256.slice(0, 12)}…</span></div> : null}
               {preview ? (
                 <div className="sheet-list">
                   {preview.sheets.map((sheet) => (
@@ -465,9 +554,75 @@ export default function DashboardClient() {
           </div>
         </section>
 
+        <section className="section-block" id="historial">
+          <div className="section-heading">
+            <div className="eyebrow"><span className="num">05</span> · Auditoría</div>
+            <h2>Historial de <em>cargas</em></h2>
+            <p className="lede">Cada importación conserva archivo, huella SHA-256, correo declarado, fecha y hora del servidor, además de una copia de todas las filas recibidas y el resultado de la conciliación.</p>
+          </div>
+          {historyError ? <div className="notice danger">{historyError}</div> : null}
+          <div className="history-list">
+            {imports.map((item) => (
+              <article className={`history-import ${selectedImportId === item.id ? "selected" : ""}`} key={item.id}>
+                <div className="history-import-main">
+                  <div className="history-id">CARGA #{item.id}</div>
+                  <strong>{item.sourceFile}</strong>
+                  <span>{formatDateTime(item.importedAt)} · {item.importedByEmail}</span>
+                  <small>{formatBytes(item.fileSizeBytes)} · SHA-256 {item.fileSha256 ? `${item.fileSha256.slice(0, 12)}…` : "no disponible"}</small>
+                </div>
+                <div className="history-stats">
+                  <span><b>{item.rowsReceived.toLocaleString("es-PE")}</b> recibidas</span>
+                  <span><b>{item.rowsInserted.toLocaleString("es-PE")}</b> nuevas</span>
+                  <span><b>{item.rowsUpdated.toLocaleString("es-PE")}</b> actualizadas</span>
+                  <span><b>{item.rowsUnchanged.toLocaleString("es-PE")}</b> sin cambio</span>
+                </div>
+                <div className="history-actions">
+                  <button className="btn" type="button" onClick={() => void loadImportDetail(item.id)} disabled={historyDetailBusy && selectedImportId === item.id}>
+                    {historyDetailBusy && selectedImportId === item.id ? "Cargando…" : "Ver datos"}
+                  </button>
+                  {item.hasFile ? <a className="btn" href={`/api/imports/${item.id}/file`}>Descargar Excel</a> : null}
+                </div>
+              </article>
+            ))}
+            {!imports.length && !historyError ? <p className="empty-state">Todavía no existen cargas auditadas en esta base.</p> : null}
+          </div>
+
+          {selectedImportId ? (
+            <div className="history-detail">
+              <div className="panel-head">
+                <div><span className="panel-kicker">Detalle histórico</span><h3>Carga #{selectedImportId}</h3></div>
+                <span className="panel-count">{historyRows.length.toLocaleString("es-PE")} / {historyTotal.toLocaleString("es-PE")}</span>
+              </div>
+              <div className="history-table-wrap">
+                <table className="history-table">
+                  <thead><tr><th>Acción</th><th>Integración</th><th>Año</th><th>Dependencia</th><th>Anterior</th><th>Cargado</th><th>Fuente</th></tr></thead>
+                  <tbody>
+                    {historyRows.map((row) => (
+                      <tr key={row.id}>
+                        <td><span className={`history-action ${row.action}`}>{actionLabel(row.action)}</span></td>
+                        <td>{row.integration}</td>
+                        <td>{row.year}</td>
+                        <td><strong>{row.csj ?? row.sede ?? row.organo ?? "No informado"}</strong><small>{[row.csj ? row.sede : null, row.organo].filter(Boolean).join(" · ")}</small></td>
+                        <td>{row.previousCantidad === null ? "—" : row.previousCantidad.toLocaleString("es-PE")}</td>
+                        <td>{row.cantidad.toLocaleString("es-PE")}</td>
+                        <td><span>{row.sourceSheet}</span><small>{row.sourceRow ? `Fila ${row.sourceRow}` : ""}</small></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {historyRows.length < historyTotal ? (
+                <button className="btn history-more" type="button" onClick={() => void loadImportDetail(selectedImportId, true)} disabled={historyDetailBusy}>
+                  {historyDetailBusy ? "Cargando…" : `Cargar ${Math.min(HISTORY_PAGE_SIZE, historyTotal - historyRows.length)} filas más`}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
         <footer className="main-footer">
           <span>{integrations.length} integraciones disponibles</span>
-          <span>Fuente: 3 Excel adjuntos · consolidado canónico v2</span>
+          <span>Actualización incremental · historial de auditoría habilitado</span>
         </footer>
       </main>
     </div>

@@ -30,18 +30,24 @@ try {
   if (process.argv.includes("--seed")) {
     const seed = await fs.readFile(path.join(root, "database", "seed.sql"), "utf8");
     await sql.unsafe(seed);
-    console.log("Seed consolidado cargado: 10 integraciones / 771 filas fuente.");
+    console.log("Seed consolidado cargado: 10 integraciones / 771 filas fuente + histórico inicial.");
   }
 
   if (process.argv.includes("--verify")) {
-    const countRows = await sql`select count(*)::int as rows from judicial_integration_records`;
+    const [countRows, importCount, historyCount] = await Promise.all([
+      sql`select count(*)::int as rows from judicial_integration_records`,
+      sql`select count(*)::int as rows from judicial_imports`,
+      sql`select count(*)::int as rows from judicial_import_rows`,
+    ]);
     const integrations = await sql`
       select integration_name, count(*)::int as rows, min(year)::int as min_year, max(year)::int as max_year, sum(cantidad)::bigint as total
       from judicial_integration_records
       group by integration_name
       order by integration_name
     `;
-    console.log(`Filas en judicial_integration_records: ${countRows[0]?.rows ?? 0}`);
+    console.log(`Filas vigentes: ${countRows[0]?.rows ?? 0}`);
+    console.log(`Cargas auditadas: ${importCount[0]?.rows ?? 0}`);
+    console.log(`Filas históricas: ${historyCount[0]?.rows ?? 0}`);
     console.table(integrations.map((row) => ({
       integracion: String(row.integration_name),
       filas: Number(row.rows),

@@ -1,6 +1,6 @@
 {
   "name": "integraciones-judiciales-sijud",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "db:init": "node scripts/init-db.mjs",
+    "db:migrate": "node scripts/init-db.mjs",
     "db:seed": "node scripts/init-db.mjs --seed",
     "db:verify": "node scripts/init-db.mjs --verify",
     "db:setup": "node scripts/init-db.mjs --seed --verify",

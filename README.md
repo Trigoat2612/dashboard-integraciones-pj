@@ -31,7 +31,11 @@ El detalle y los totales de validación están en `docs/FUENTES.md` y `data/sour
 - tabla dinámica jerárquica similar a las hojas `Res*`
 - exportación CSV
 - importación Excel con vista previa
+- actualización incremental: actualiza coincidencias y agrega claves nuevas
 - exclusión automática de hojas `Res*`
+- auditoría obligatoria por correo, fecha/hora de servidor y SHA-256 recalculado en backend
+- conservación del Excel original para las cargas v1.2.0+ (máximo 4 MB)
+- histórico inmutable de cada fila recibida en cada carga
 - trazabilidad por archivo, hoja y fila fuente
 - persistencia en Neon
 
@@ -148,16 +152,42 @@ data/                   fallback local de 771 filas + resumen
 database/schema.sql     esquema PostgreSQL
 database/seed.sql       carga de las 771 filas
 database/verify.sql     validaciones
+database/migration_v1.2.0.sql migración segura para Neon existente
 database/neon_setup.sql esquema + seed + verificación
 scripts/init-db.mjs     inicialización desde DATABASE_URL
 neon.ts                 configuración declarativa Neon
 docs/FUENTES.md         validación de los Excel
 docs/NEON_SETUP.md      pasos Neon/Vercel
+docs/IMPORT_AUDIT.md     reglas de actualización e histórico
 ```
 
-## Fuente Excel futura
+## Actualización Excel · v1.2.0
 
-Para reemplazar el corte desde la interfaz, carga el libro que contenga las hojas fuente y selecciona **Reemplazar base**. El importador omite automáticamente las hojas `Res*`, porque son tablas dinámicas derivadas y cargarlas produciría doble conteo. El ser humano ya inventó suficientes formas de duplicar datos sin que el dashboard colabore.
+La carga ya no reemplaza toda la base ni agrega filas a ciegas. Cada fila se concilia con la tabla vigente usando la clave funcional:
+
+`Integración + Año + CSJ + Sede + Órgano/Instancia + Medida`
+
+- coincidencia con cantidad distinta → **actualiza**;
+- clave nueva → **inserta**;
+- coincidencia sin cambio → conserva el dato y registra la carga;
+- registro existente ausente del Excel → **se conserva**.
+
+Antes de guardar, la interfaz exige el correo del usuario que realiza la carga. El backend vuelve a procesar el archivo real, calcula su SHA-256, PostgreSQL registra la fecha/hora y conserva tanto el Excel original (hasta 4 MB) como una copia histórica de todas las filas recibidas. Las hojas `Res*` continúan excluidas para evitar doble conteo.
+
+### Migrar una base Neon existente desde v1.1.x
+
+Si ya tienes los 771 registros funcionando, **no ejecutes `npm run db:setup`**. Ejecuta:
+
+```bash
+npm install
+npm run db:migrate
+npm run db:verify
+npm run dev
+```
+
+`db:migrate` amplía el esquema sin borrar los datos actuales. El histórico previo queda identificado como `legacy` con el correo técnico `migracion@sijud.local`, porque las versiones anteriores no solicitaban correo.
+
+Consulta `docs/IMPORT_AUDIT.md` para la regla completa de conciliación y auditoría.
 
 ## v1.1.1 · Corrección del gráfico anual
 
@@ -187,3 +217,15 @@ node -p "require('xlsx/package.json').version"
 El resultado esperado es `0.20.3`.
 
 Consulta `SECURITY.md` antes de modificar esta dependencia.
+
+## v1.2.0 · Incremental Import & Audit Trail
+
+- Actualiza registros vigentes por clave funcional y agrega registros nuevos.
+- No elimina registros que no estén presentes en el nuevo Excel.
+- Solicita correo de auditoría antes de cada carga.
+- Fecha/hora se registra en PostgreSQL, no desde el navegador.
+- Registra SHA-256 y tamaño del archivo desde el backend.
+- Conserva y permite descargar el Excel original de las cargas v1.2.0+.
+- Conserva cada fila de cada carga en `judicial_import_rows`.
+- Historial visible desde el dashboard con detalle paginado.
+- Mantiene SheetJS CE 0.20.3 y la corrección responsive del gráfico anual.

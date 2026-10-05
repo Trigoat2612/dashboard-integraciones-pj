@@ -46,7 +46,9 @@ neon deploy
 
 > `neon deploy` administra la configuración declarativa de Neon, pero **no crea las tablas ni carga los 771 registros del dashboard**. Esa parte se ejecuta con SQL.
 
-## 3. Crear tablas y cargar el corte estadístico
+## 3. Base de datos
+
+### Si Neon está vacío
 
 Con `DATABASE_URL` disponible en `.env.local`:
 
@@ -55,24 +57,28 @@ npm install
 npm run db:setup
 ```
 
-`db:setup` ejecuta, en este orden:
+`db:setup` crea el esquema, carga el corte inicial de 771 filas y crea su histórico inicial.
 
-1. `database/schema.sql`
-2. `database/seed.sql`
-3. verificación de cantidad de filas y totales por integración
+### Si ya vienes de v1.1.x y tus 771 registros están funcionando
 
-Resultado esperado:
-
-```text
-Filas en judicial_integration_records: 771
-```
-
-También puedes ejecutar cada paso por separado:
+No vuelvas a ejecutar `db:setup`, porque el seed reconstruye el corte inicial. Migra únicamente el esquema:
 
 ```bash
-npm run db:init
-npm run db:seed
+npm install
+npm run db:migrate
 npm run db:verify
+```
+
+La migración agrega las tablas/columnas de auditoría sin borrar los registros vigentes. Los registros anteriores quedan respaldados como histórico `legacy`.
+
+Comandos disponibles:
+
+```bash
+npm run db:init       # crea/actualiza esquema
+npm run db:migrate    # alias seguro de db:init
+npm run db:seed       # REINICIA con el seed inicial
+npm run db:verify     # valida datos vigentes e histórico
+npm run db:setup      # esquema + seed + verificación; usar solo para base nueva
 ```
 
 ## 4. Vercel

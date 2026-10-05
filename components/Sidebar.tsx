@@ -1,6 +1,6 @@
 "use client";
 
-import { IconChart, IconClose, IconMenu, IconOverview, IconTable, IconUpload } from "@/components/icons";
+import { IconChart, IconClose, IconHistory, IconMenu, IconOverview, IconTable, IconUpload } from "@/components/icons";
 
 type Props = {
   open: boolean;
@@ -15,6 +15,7 @@ const items = [
   { id: "distribucion", num: "02", label: "Distribución", icon: IconChart },
   { id: "dependencias", num: "03", label: "Dependencias", icon: IconTable },
   { id: "fuente", num: "04", label: "Fuente Excel", icon: IconUpload },
+  { id: "historial", num: "05", label: "Historial", icon: IconHistory },
 ];
 
 function fmtDate(value: string | null): string {

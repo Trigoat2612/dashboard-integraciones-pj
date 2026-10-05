@@ -1,6 +1,5 @@
 begin;
-truncate table judicial_integration_records restart identity;
-truncate table judicial_imports restart identity;
+truncate table judicial_import_rows, judicial_integration_records, judicial_imports restart identity cascade;
 
 insert into judicial_integration_records
 (integration_name, year, csj, sede, organo, measure_name, source_measure_name, cantidad, source_sheet, source_file, source_row)
@@ -777,6 +776,37 @@ values
 ('SUNARP',2025,'Lima Este',null,'JUZGADO DE TRABAJO - ZONA 02','Cantidad','Cant.Envios Sunarp',1,'sunarp','Reporte Estadistico de la Integraciones v2(1).xlsx',3),
 ('SUNARP',2025,'Lima Este',null,'1º JUZGADO DE PAZ LETRADO LABORAL - ZONA 02','Cantidad','Cant.Envios Sunarp',2,'sunarp','Reporte Estadistico de la Integraciones v2(1).xlsx',4);
 
-insert into judicial_imports (source_file, rows_imported, import_mode)
-values ('Reporte Estadistico de la Integraciones v2(1).xlsx', 771, 'replace');
+do $$
+declare
+  v_import_id bigint;
+begin
+  insert into judicial_imports (
+    source_file, rows_imported, import_mode, imported_by_email,
+    file_sha256, file_size_bytes, rows_received, rows_inserted, rows_updated, rows_unchanged, integration_count
+  )
+  values (
+    'Reporte Estadistico de la Integraciones v2(1).xlsx', 771, 'merge', 'carga-inicial@sijud.local',
+    'f6ec5759a7b8d8a3644841d50913f2493f38dc172a5622726988f900567b2241', 113620,
+    771, 771, 0, 0, 10
+  )
+  returning id into v_import_id;
+
+  update judicial_integration_records
+  set
+    source_import_id = v_import_id,
+    created_by_email = 'carga-inicial@sijud.local',
+    updated_by_email = 'carga-inicial@sijud.local',
+    last_seen_at = now();
+
+  insert into judicial_import_rows (
+    import_id, current_record_id, integration_name, year, csj, sede, organo,
+    measure_name, source_measure_name, cantidad, previous_cantidad,
+    source_sheet, source_file, source_row, row_action
+  )
+  select
+    v_import_id, id, integration_name, year, csj, sede, organo,
+    measure_name, source_measure_name, cantidad, null,
+    source_sheet, source_file, source_row, 'inserted'
+  from judicial_integration_records;
+end $$;
 commit;
