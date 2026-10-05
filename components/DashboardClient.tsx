@@ -228,6 +228,15 @@ export default function DashboardClient() {
 
   const maxAnnual = Math.max(1, ...annual.map((item) => item.cantidad));
   const maxTop = Math.max(1, ...topSedes.map((item) => item.cantidad));
+  const annualDense = annual.length > 7;
+  const annualScrollable = annual.length > 14;
+  const annualValueFormatter = useMemo(
+    () => new Intl.NumberFormat("es-PE", {
+      notation: annualDense ? "compact" : "standard",
+      maximumFractionDigits: annual.length > 10 ? 0 : annualDense ? 1 : 0,
+    }),
+    [annual.length, annualDense],
+  );
 
   const setFilter = (name: keyof Filters, value: string) => {
     setFilters((current) => {
@@ -344,14 +353,29 @@ export default function DashboardClient() {
           <div className="analysis-grid">
             <article className="panel">
               <div className="panel-head"><div><span className="panel-kicker">Distribución anual</span><h3>Cantidad reportada por año</h3></div><span className="panel-count">{annual.length} años</span></div>
-              <div className="bar-chart" aria-label="Distribución anual">
-                {annual.map((item) => (
-                  <button key={item.year} className={`bar-item ${filters.year === String(item.year) ? "selected" : ""}`} onClick={() => setFilter("year", filters.year === String(item.year) ? "" : String(item.year))} title={`Filtrar ${item.year}`}>
-                    <span className="bar-value">{item.cantidad.toLocaleString("es-PE")}</span>
-                    <span className="bar-track"><span className="bar-fill" style={{ height: `${Math.max(3, (item.cantidad / maxAnnual) * 100)}%` }} /></span>
-                    <span className="bar-year">{item.year}</span>
-                  </button>
-                ))}
+              <div className="bar-chart-viewport">
+                <div
+                  className={`bar-chart ${annualDense ? "dense" : ""} ${annualScrollable ? "scrollable" : ""}`}
+                  aria-label="Distribución anual"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(1, annual.length)}, minmax(0, 1fr))`,
+                    minWidth: annualScrollable ? `${annual.length * 46}px` : undefined,
+                  }}
+                >
+                  {annual.map((item) => (
+                    <button
+                      key={item.year}
+                      className={`bar-item ${filters.year === String(item.year) ? "selected" : ""}`}
+                      onClick={() => setFilter("year", filters.year === String(item.year) ? "" : String(item.year))}
+                      title={`${item.year}: ${item.cantidad.toLocaleString("es-PE")} · seleccionar para filtrar`}
+                      aria-label={`${item.year}: ${item.cantidad.toLocaleString("es-PE")}. Seleccionar para filtrar.`}
+                    >
+                      <span className="bar-value">{annualValueFormatter.format(item.cantidad)}</span>
+                      <span className="bar-track"><span className="bar-fill" style={{ height: `${Math.max(3, (item.cantidad / maxAnnual) * 100)}%` }} /></span>
+                      <span className="bar-year">{item.year}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <p className="panel-note">Selecciona una barra para filtrar el año.</p>
             </article>

@@ -158,3 +158,32 @@ docs/NEON_SETUP.md      pasos Neon/Vercel
 ## Fuente Excel futura
 
 Para reemplazar el corte desde la interfaz, carga el libro que contenga las hojas fuente y selecciona **Reemplazar base**. El importador omite automáticamente las hojas `Res*`, porque son tablas dinámicas derivadas y cargarlas produciría doble conteo. El ser humano ya inventó suficientes formas de duplicar datos sin que el dashboard colabore.
+
+## v1.1.1 · Corrección del gráfico anual
+
+- El gráfico anual ya no invade el panel de ranking cuando una integración contiene muchos años.
+- Hasta 14 años se distribuyen dentro del ancho disponible con modo compacto.
+- Para series mayores se habilita desplazamiento horizontal dentro del propio gráfico, sin desbordar el layout.
+- Los valores completos se conservan en el tooltip/título accesible de cada barra.
+
+
+## Seguridad de SheetJS
+
+El proyecto usa SheetJS CE **0.20.3** directamente desde el canal oficial de SheetJS. No se debe sustituir por `xlsx` del registro público de npm, cuya versión histórica 0.18.5 está afectada por vulnerabilidades conocidas.
+
+Instalación esperada:
+
+```bash
+npm install
+npm audit
+```
+
+Para comprobar la versión instalada:
+
+```bash
+node -p "require('xlsx/package.json').version"
+```
+
+El resultado esperado es `0.20.3`.
+
+Consulta `SECURITY.md` antes de modificar esta dependencia.
