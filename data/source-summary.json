@@ -1,0 +1,206 @@
+{
+  "Sentido de Fallo": {
+    "rows": 42,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 1435,
+      "2025": 969,
+      "2026": 579
+    },
+    "total": 2983,
+    "has_csj": false,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "fallolaboral",
+    "source_measure_name": "cantidad"
+  },
+  "REPEJ": {
+    "rows": 4,
+    "years": [
+      2024,
+      2025
+    ],
+    "yearly": {
+      "2024": 5,
+      "2025": 3
+    },
+    "total": 8,
+    "has_csj": true,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "REPEJ",
+    "source_measure_name": "Cantidad"
+  },
+  "SERNOT": {
+    "rows": 440,
+    "years": [
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2014": 13874,
+      "2015": 35874,
+      "2016": 127313,
+      "2017": 173819,
+      "2018": 181440,
+      "2019": 146963,
+      "2020": 56890,
+      "2021": 122853,
+      "2022": 123547,
+      "2023": 127867,
+      "2024": 156413,
+      "2025": 146793,
+      "2026": 115607
+    },
+    "total": 1529253,
+    "has_csj": false,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "SERNOT",
+    "source_measure_name": "TOTAL_CEDULAS"
+  },
+  "REDJUM": {
+    "rows": 6,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 21,
+      "2025": 26,
+      "2026": 20
+    },
+    "total": 67,
+    "has_csj": true,
+    "has_sede": false,
+    "has_organo": true,
+    "source_sheet": "REDJUM",
+    "source_measure_name": "Cantidad"
+  },
+  "Embargos": {
+    "rows": 54,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 1294,
+      "2025": 1559,
+      "2026": 1310
+    },
+    "total": 4163,
+    "has_csj": true,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "embargos",
+    "source_measure_name": "Cantidad"
+  },
+  "Multas": {
+    "rows": 73,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 201,
+      "2025": 246,
+      "2026": 265
+    },
+    "total": 712,
+    "has_csj": true,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "sinarej multas",
+    "source_measure_name": "Cantidad"
+  },
+  "Jurisprudencia": {
+    "rows": 5,
+    "years": [
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2025": 850,
+      "2026": 689
+    },
+    "total": 1539,
+    "has_csj": false,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "jurisprudencia",
+    "source_measure_name": "Cantidad Expedientes"
+  },
+  "Casillero Digital": {
+    "rows": 83,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 87953,
+      "2025": 80510,
+      "2026": 57216
+    },
+    "total": 225679,
+    "has_csj": false,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "casillero",
+    "source_measure_name": "count()"
+  },
+  "Depósitos": {
+    "rows": 61,
+    "years": [
+      2024,
+      2025,
+      2026
+    ],
+    "yearly": {
+      "2024": 2751,
+      "2025": 3767,
+      "2026": 3621
+    },
+    "total": 10139,
+    "has_csj": false,
+    "has_sede": true,
+    "has_organo": true,
+    "source_sheet": "depositos",
+    "source_measure_name": "Cantidad Expedientes"
+  },
+  "SUNARP": {
+    "rows": 3,
+    "years": [
+      2024,
+      2025
+    ],
+    "yearly": {
+      "2024": 1,
+      "2025": 3
+    },
+    "total": 4,
+    "has_csj": true,
+    "has_sede": false,
+    "has_organo": true,
+    "source_sheet": "sunarp",
+    "source_measure_name": "Cant.Envios Sunarp"
+  }
+}

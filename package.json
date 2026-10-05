@@ -1,0 +1,31 @@
+{
+  "name": "integraciones-judiciales-sijud",
+  "version": "1.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "db:init": "node scripts/init-db.mjs",
+    "db:seed": "node scripts/init-db.mjs --seed",
+    "db:verify": "node scripts/init-db.mjs --verify",
+    "db:setup": "node scripts/init-db.mjs --seed --verify",
+    "neon:deploy": "neon deploy"
+  },
+  "dependencies": {
+    "jose": "^5.10.0",
+    "next": "^16.3.5",
+    "postgres": "^3.4.7",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@neon/config": "^1.8.3",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.0"
+  }
+}
